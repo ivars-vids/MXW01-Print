@@ -1,0 +1,135 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link href="bootstrap.min.css" rel="stylesheet">
+<link href="suneditor.min.css" rel="stylesheet">
+<script src="jquery-3.7.1.slim.min.js"></script>
+<script src="bootstrap.min.js"></script>
+<style>
+.sun-editor-editable {padding: 0}
+.sun-editor-editable[contenteditable=true] .se-component {outline: none}
+.sun-editor .se-wrapper .se-wrapper-inner {overflow: hidden}
+</style>
+<script src="suneditor.min.js"></script>
+<script src="html-to-image.min.js"></script>
+<script src="MXW01.js"></script>
+</head>
+<body>
+<div class="container mt-3">
+    <!-- Control Buttons -->
+    <div class="row mb-3">
+        <div class="col-3">
+            <button class="btn btn-primary w-100" onclick="printer.connect()">Connect</button>
+        </div>
+        <div class="col-3">
+            <button class="btn btn-success w-100" onclick="print()">Print</button>
+        </div>
+        <div class="col-6">
+            <span id="status" class="text-muted align-self-center" style="min-width: 120px;">
+                Not connected
+            </span>
+        </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="row mb-3">
+        <div class="col-md-6 mb-2">
+            <div class="form-group row align-items-center">
+                <div class="col-3">
+                    <label class="form-label mb-0" for="contrast">Contrast</label>
+                </div>
+                <div class="col-9">
+                    <input type="number" id="contrast" value="80" min="10" max="100" class="form-control" />
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-2">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="2" id="highres">
+                <label class="form-check-label" for="highres">
+                    High Resolution
+                </label>
+            </div>
+        </div>
+    </div>
+    <!-- Editor -->
+    <div class="editor-container mx-auto mb-4" style="max-width: 386px;">
+        <textarea id="field" style="display:none;"></textarea>
+    </div>
+
+    <!-- Pagination -->
+    <div class="row mb-4 mx-auto align-items-center justify-content-center">
+	<div class="col-auto">
+            <button class="btn btn-primary btn-lg" onclick="offset = (pages + offset -1) % pages; showIcons()">&lt;&lt;</button>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary btn-lg" onclick="offset = (offset +1) % pages; showIcons()">&gt;&gt;</button>
+        </div>
+        <div class="col-auto">
+            <span id="pages" class="h4"></span>
+        </div>
+    </div>
+
+    <!-- Icons Grid -->
+    <div id="icons" class="row row-cols-4 row-cols-sm-6 row-cols-md-8"></div>
+</div>
+
+<script>
+    const printer = new CatPrinter(updateStatus);
+    const perPage = 32;
+    var pages = 0;
+    var offset = 0;
+    var icons = [];
+
+    function updateStatus(text){
+        const status = document.getElementById('status');
+        status.textContent = text;
+    }
+
+    function print(){
+        const highres = document.querySelector('#highres').checked ? 2 : 0;
+        const contrast = document.querySelector('#contrast').value;
+        htmlToImage
+            .toPng(document.querySelector('.se-wrapper'))
+            .then((dataUrl) => {
+                printer.print(dataUrl, contrast, highres);
+            })    
+    }
+
+    function showIcons(){
+        document.querySelector('#pages').innerText = (offset + 1) + ' / ' + (pages);
+        const iconsContainer = document.querySelector('#icons');
+        iconsContainer.innerHTML = '';
+        
+        for (let x = 0; x < perPage; x++){
+            if (icons[offset * perPage + x]) {
+                const imgHTML = `<img width="64" height="64" src="images/${icons[offset * perPage + x]}" 
+                                    class="img-fluid" 
+                                    data-size="100%," 
+                                    onclick="wysiwyg.insertHTML(this.outerHTML)">`;
+                iconsContainer.innerHTML += `<div class="col mb-1 text-center">${imgHTML}</div>`;
+            }
+        }
+    }
+
+    const wysiwyg = SUNEDITOR.create('field', {
+        display: 'block',
+        width: '100%',
+        height: 'auto',
+        popupDisplay: 'full',
+        buttonList: [
+            ['font', 'fontSize', 'formatBlock'],
+            ['bold', 'underline', 'italic', 'strike', 'subscript', 'superscript'],
+            ['image']
+        ],
+        placeholder: 'Start typing something...'
+    });
+
+    fetch('images.json').then(e=>e.json()).then(e=>{
+        icons = e;
+        pages = Math.ceil(icons.length / perPage);
+        showIcons();
+    })
+</script>
+</body>
+</html>
