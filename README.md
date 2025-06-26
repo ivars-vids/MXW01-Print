@@ -4,6 +4,7 @@
 ## Tested on
 Windows:
 * Chrome
+
 Android:
 * Chrome
 * Edge
