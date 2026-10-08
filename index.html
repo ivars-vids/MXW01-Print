@@ -1,13 +1,119 @@
-
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link href="bootstrap.min.css" rel="stylesheet">
 <link href="suneditor.min.css" rel="stylesheet">
+<meta charset="UTF-8">
 <style>
+/* ===== your original rules ===== */
 .sun-editor-editable {padding: 0}
 .sun-editor-editable[contenteditable=true] .se-component {outline: none}
 .sun-editor .se-wrapper .se-wrapper-inner {overflow: hidden}
+
+/* ===== mode tabs (Text / Draw) ===== */
+.mode-tabs{
+  display:flex; gap:6px; margin-bottom:10px;
+  border-bottom:2px solid #e2e8f0;
+}
+.mode-tab{
+  appearance:none; background:transparent; border:0;
+  border-bottom:3px solid transparent;
+  padding:8px 18px; margin-bottom:-2px;
+  font-size:15px; font-weight:600; color:#64748b; cursor:pointer;
+  transition: color .15s, background .15s, border-color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mode-tab:hover{ color:#1e293b; background:#e2e8f0; }
+.mode-tab.active{ color:#2563eb; border-bottom-color:#2563eb; background:#fff; }
+
+.mode-view{ display:none; }
+.mode-view.active{ display:block; }
+
+/* ===== drawing area — 384px wide ===== */
+.draw-wrap{
+  width: 384px;
+  max-width: 100%;
+  display:flex; flex-direction:column; gap:10px;
+  margin: 0 auto;
+}
+
+.toolbar{
+  width:100%;
+  display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+  background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:8px;
+}
+.tool-row{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.tool-row + .tool-row{
+  width:100%; border-top:1px solid #e2e8f0; padding-top:6px; margin-top:2px;
+}
+
+.tool-btn{
+  width:34px; height:34px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid #d8dee9; background:#fff; border-radius:8px;
+  color:#475569; cursor:pointer; transition:.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tool-btn svg{ width:18px; height:18px; }
+.tool-btn:hover{ background:#f1f5f9; color:#1e293b; }
+.tool-btn.active{
+  background:#2563eb; border-color:#2563eb; color:#fff;
+  box-shadow:0 2px 6px rgba(37,99,235,.3);
+}
+
+/* grayscale swatches */
+.swatch{
+  width:24px; height:24px; padding:0; border-radius:50%;
+  border:2px solid #fff; box-shadow:0 0 0 1px #d1d5db;
+  cursor:pointer; transition: transform .12s, box-shadow .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.swatch.active{ box-shadow:0 0 0 2px #2563eb; transform:scale(1.12); }
+
+.range-wrap{
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; font-weight:600; color:#475569;
+}
+.range-wrap input[type=range]{ width:90px; accent-color:#2563eb; }
+#sizeValue{ min-width:18px; text-align:center; font-variant-numeric:tabular-nums; }
+
+.chk-wrap{
+  display:flex; align-items:center; gap:5px;
+  font-size:12px; font-weight:600; color:#475569; cursor:pointer; user-select:none;
+}
+.chk-wrap input{ width:16px; height:16px; accent-color:#2563eb; }
+
+.act-btn{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:6px 10px; font-size:12px; font-weight:600;
+  border:1px solid #d8dee9; background:#fff; color:#334155;
+  border-radius:8px; cursor:pointer; transition:.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.act-btn:hover{ background:#f1f5f9; }
+.act-btn:disabled{ opacity:.4; cursor:not-allowed; }
+.act-btn.primary{ background:#2563eb; border-color:#2563eb; color:#fff; }
+.act-btn.primary:hover{ background:#1d4ed8; }
+.act-btn.danger{ color:#dc2626; border-color:#fecaca; }
+.act-btn.danger:hover{ background:#fef2f2; }
+
+.canvas-holder{
+  position:relative;
+  width: 384px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  background:#fff;
+  border:1px solid #d1d5db; border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 1px 3px rgba(0,0,0,.08);
+  user-select:none; -webkit-user-select:none;
+}
+.canvas-holder canvas{
+  position:absolute; inset:0;
+  width:100%; height:100%; display:block;
+}
+#baseCanvas{ z-index:1; }
+#liveCanvas{ z-index:2; touch-action:none; cursor:crosshair; }
 </style>
 <script src="suneditor.min.js"></script>
 <script src="html-to-image.min.js"></script>
@@ -15,7 +121,8 @@
 </head>
 <body>
 <div class="container mt-3">
-    <!-- Control Buttons -->
+
+    <!-- ===== YOUR ORIGINAL CONTROL BUTTONS ===== -->
     <div class="row mb-3">
         <div class="col-3">
             <button class="btn btn-primary w-100" onclick="printer.connect()">Connect</button>
@@ -30,7 +137,7 @@
         </div>
     </div>
 
-    <!-- Settings -->
+    <!-- ===== YOUR ORIGINAL SETTINGS ===== -->
     <div class="row mb-3">
         <div class="col-md-6 mb-2">
             <div class="form-group row align-items-center">
@@ -51,87 +158,568 @@
             </div>
         </div>
     </div>
-    <!-- Editor -->
-    <div class="editor-container mx-auto mb-4" style="max-width: 386px;">
-        <textarea id="field" style="display:none;"></textarea>
+
+    <!-- ===== MODE SWITCH: Text | Draw ===== -->
+    <div class="mode-tabs" role="tablist" style="max-width:386px;margin-left:auto;margin-right:auto;">
+        <button type="button" class="mode-tab active" data-mode="text">✏️ Text</button>
+        <button type="button" class="mode-tab" data-mode="draw">🎨 Draw</button>
     </div>
 
-    <!-- Pagination -->
-    <div class="row mb-4 mx-auto align-items-center justify-content-center">
-	<div class="col-auto">
-            <button class="btn btn-primary btn-lg" onclick="offset = (pages + offset -1) % pages; showIcons()">&lt;&lt;</button>
+    <!-- ===== TEXT MODE (editor + pagination + icons) ===== -->
+    <div class="mode-view active" id="view-text">
+        <div class="editor-container mx-auto mb-4" style="max-width: 386px;">
+            <textarea id="field" style="display:none;"></textarea>
         </div>
-        <div class="col-auto">
-            <button class="btn btn-primary btn-lg" onclick="offset = (offset +1) % pages; showIcons()">&gt;&gt;</button>
+
+        <!-- Pagination (moved here — only visible in Text mode) -->
+        <div class="row mb-4 mx-auto align-items-center justify-content-center">
+            <div class="col-auto">
+                <button class="btn btn-primary btn-lg" onclick="offset = (pages + offset -1) % pages; showIcons()">&lt;&lt;</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary btn-lg" onclick="offset = (offset +1) % pages; showIcons()">&gt;&gt;</button>
+            </div>
+            <div class="col-auto">
+                <span id="pages" class="h4"></span>
+            </div>
         </div>
-        <div class="col-auto">
-            <span id="pages" class="h4"></span>
+
+        <!-- Icons Grid -->
+        <div id="icons" class="row row-cols-4 row-cols-sm-6 row-cols-md-8"></div>
+    </div>
+
+    <!-- ===== DRAW MODE ===== -->
+    <div class="mode-view" id="view-draw">
+        <div class="draw-wrap">
+            <!-- Toolbar -->
+            <div class="toolbar">
+
+                <!-- Tools -->
+                <div class="tool-row" id="toolGroup">
+                    <button type="button" class="tool-btn active" data-tool="pen" title="Pen" aria-label="Pen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15.5 4.5l4 4L8 20l-5 1 1-5 11.5-11.5z"/><path d="M13.5 6.5l4 4"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="marker" title="Marker" aria-label="Marker">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 20h16"/><path d="M14 4.5l5.5 5.5-8 8H6v-5.5l8-8z"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="eraser" title="Eraser" aria-label="Eraser">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M7 20h13"/>
+                            <path d="M4.6 15.4l7-7a2 2 0 0 1 2.8 0l4.2 4.2a2 2 0 0 1 0 2.8L15 19H8.4l-3.8-3.6a2 2 0 0 1 0-2.8z"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="line" title="Line" aria-label="Line">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                            <line x1="5" y1="19" x2="19" y2="5"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="rect" title="Rectangle" aria-label="Rectangle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                            <rect x="4" y="6" width="16" height="12" rx="1.5"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="ellipse" title="Circle / Ellipse" aria-label="Circle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <circle cx="12" cy="12" r="8"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="triangle" title="Triangle" aria-label="Triangle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                            <path d="M12 4.5L20 19H4z"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="tool-btn" data-tool="arrow" title="Arrow" aria-label="Arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="19" x2="18" y2="6"/><polyline points="11,6 18,6 18,13"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Grayscale colours only -->
+                <div class="tool-row" id="colorGroup">
+                    <button type="button" class="swatch active" data-color="#000000" style="background:#000000" aria-label="Black"></button>
+                    <button type="button" class="swatch" data-color="#333333" style="background:#333333" aria-label="Dark gray"></button>
+                    <button type="button" class="swatch" data-color="#666666" style="background:#666666" aria-label="Mid gray"></button>
+                    <button type="button" class="swatch" data-color="#999999" style="background:#999999" aria-label="Light gray"></button>
+                    <button type="button" class="swatch" data-color="#cccccc" style="background:#cccccc" aria-label="Lighter gray"></button>
+                    <button type="button" class="swatch" data-color="#ffffff" style="background:#ffffff" aria-label="White"></button>
+                </div>
+
+                <!-- Size / fill -->
+                <div class="tool-row">
+                    <label class="range-wrap">
+                        Size
+                        <input type="range" id="sizeRange" min="1" max="60" value="6">
+                        <span id="sizeValue">6</span>
+                    </label>
+                    <label class="chk-wrap">
+                        <input type="checkbox" id="fillChk"> Fill
+                    </label>
+                </div>
+
+                <!-- Actions (PNG button removed) -->
+                <div class="tool-row">
+                    <button type="button" class="act-btn" id="undoBtn" disabled>↶ Undo</button>
+                    <button type="button" class="act-btn" id="redoBtn" disabled>↷ Redo</button>
+                    <button type="button" class="act-btn danger" id="clearBtn">🗑 Clear</button>
+                    <button type="button" class="act-btn primary" id="insertBtn">Insert to text</button>
+                </div>
+
+            </div>
+
+            <!-- Canvas -->
+            <div class="canvas-holder">
+                <canvas id="baseCanvas"></canvas>
+                <canvas id="liveCanvas"></canvas>
+            </div>
         </div>
     </div>
 
-    <!-- Icons Grid -->
-    <div id="icons" class="row row-cols-4 row-cols-sm-6 row-cols-md-8"></div>
 </div>
 
 <script>
-    const printer = new CatPrinter(updateStatus);
-    const perPage = 32;
-    var pages = 0;
-    var offset = 0;
-    var icons = [];
+/* ============================================================
+   YOUR ORIGINAL PRINTER + ICON LOGIC
+   ============================================================ */
+const printer = new CatPrinter(updateStatus);
+const perPage = 32;
+var pages = 0;
+var offset = 0;
+var icons = [];
 
-    function updateStatus(text){
-        const status = document.getElementById('status');
-        status.textContent = text;
-    }
+function updateStatus(text){
+    const status = document.getElementById('status');
+    status.textContent = text;
+}
 
-    function print(){
-        const highres = document.querySelector('#highres').checked ? 2 : 0;
-        const contrast = document.querySelector('#contrast').value;
-        htmlToImage
-            .toPng(document.querySelector('.se-wrapper'))
-            .then((dataUrl) => {
-                printer.print(dataUrl, contrast, highres);
-            })    
-    }
+function showIcons(){
+    document.querySelector('#pages').innerText = (offset + 1) + ' / ' + (pages);
+    const iconsContainer = document.querySelector('#icons');
+    iconsContainer.innerHTML = '';
 
-    function showIcons(){
-        document.querySelector('#pages').innerText = (offset + 1) + ' / ' + (pages);
-        const iconsContainer = document.querySelector('#icons');
-        iconsContainer.innerHTML = '';
-        
-        for (let x = 0; x < perPage; x++){
-            if (icons[offset * perPage + x]) {
-                const imgHTML = `<img width="64" height="64" src="images/${icons[offset * perPage + x]}" 
-                                    class="img-fluid" 
-                                    data-size="100%," 
-                                    onclick="wysiwyg.insertHTML(this.outerHTML)">`;
-                iconsContainer.innerHTML += `<div class="col mb-1 text-center">${imgHTML}</div>`;
-            }
+    for (let x = 0; x < perPage; x++){
+        if (icons[offset * perPage + x]) {
+            const imgHTML = `<img width="64" height="64" src="images/${icons[offset * perPage + x]}"
+                                class="img-fluid"
+                                data-size="100%,"
+                                onclick="wysiwyg.insertHTML(this.outerHTML)">`;
+            iconsContainer.innerHTML += `<div class="col mb-1 text-center">${imgHTML}</div>`;
         }
     }
+}
 
-    const wysiwyg = SUNEDITOR.create('field', {
-        display: 'block',
-        width: '100%',
-        height: 'auto',
-        popupDisplay: 'full',
-        colorList : ['#000000','#111111','#222222','#333333','#444444','#555555','#666666','#777777','#888888','#999999','#aaaaaa','#bbbbbb','#cccccc','#dddddd','#eeeeee','#ffffff'],
-        fontSize : [12, 14, 18, 24, 36, 40, 48, 56, 64, 72, 80, 90, 100],
-        defaultStyle: "font-size:36px; color:black;",
-        buttonList: [
-            ['font', 'fontSize', 'fontColor', 'hiliteColor'],
-            ['bold', 'underline', 'italic', 'strike', 'subscript', 'superscript', 'align'],
-            ['image']
-        ],
-        placeholder: 'Start typing something...'
+/* ============================================================
+   SUNEDITOR (your original config)
+   ============================================================ */
+const wysiwyg = SUNEDITOR.create('field', {
+    display: 'block',
+    width: '100%',
+    height: 'auto',
+    popupDisplay: 'full',
+    colorList : ['#000000','#111111','#222222','#333333','#444444','#555555','#666666','#777777','#888888','#999999','#aaaaaa','#bbbbbb','#cccccc','#dddddd','#eeeeee','#ffffff'],
+    fontSize : [12, 14, 18, 24, 36, 40, 48, 56, 64, 72, 80, 90, 100],
+    defaultStyle: "font-size:36px; color:black;",
+    buttonList: [
+        ['font', 'fontSize', 'fontColor', 'hiliteColor'],
+        ['bold', 'underline', 'italic', 'strike', 'subscript', 'superscript', 'align'],
+        ['image']
+    ],
+    placeholder: 'Start typing something...'
+});
+
+fetch('images.json').then(e=>e.json()).then(e=>{
+    icons = e;
+    pages = Math.ceil(icons.length / perPage);
+    showIcons();
+});
+
+/* ============================================================
+   MODE SWITCH: Text | Draw
+   ============================================================ */
+var currentMode = 'text';
+document.querySelectorAll('.mode-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+        currentMode = tab.dataset.mode;
+        document.querySelectorAll('.mode-tab').forEach(function (t) {
+            t.classList.toggle('active', t === tab);
+        });
+        document.querySelectorAll('.mode-view').forEach(function (v) {
+            v.classList.toggle('active', v.id === 'view-' + currentMode);
+        });
     });
+});
 
-    fetch('images.json').then(e=>e.json()).then(e=>{
-        icons = e;
-        pages = Math.ceil(icons.length / perPage);
-        showIcons();
-    })
+/* ============================================================
+   CANVAS DRAWING ENGINE
+   ============================================================ */
+(function () {
+  var base = document.getElementById('baseCanvas');
+  var live = document.getElementById('liveCanvas');
+  var bctx = base.getContext('2d');
+  var lctx = live.getContext('2d');
+
+  /* 2× logical resolution of 384×288 for crisp output */
+  var W = 768, H = 576;
+
+  base.width = W; base.height = H;
+  live.width = W; live.height = H;
+
+  bctx.lineCap = bctx.lineJoin = 'round';
+  lctx.lineCap = lctx.lineJoin = 'round';
+
+  function fillWhite() {
+    bctx.save();
+    bctx.globalAlpha = 1;
+    bctx.fillStyle = '#ffffff';
+    bctx.fillRect(0, 0, W, H);
+    bctx.restore();
+  }
+  fillWhite();
+
+  var tool = 'pen';
+  var color = '#000000';
+  var size = 6;
+  var fillShapes = false;
+
+  var drawing = false;
+  var startPt = null;
+  var lastPt = null;
+  var points = [];
+
+  function getPos(e) {
+    var r = live.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * (W / r.width),
+      y: (e.clientY - r.top)  * (H / r.height)
+    };
+  }
+
+  function clearLive() { lctx.clearRect(0, 0, W, H); }
+
+  function dotOn(ctx, p, c, s) {
+    ctx.save();
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(s / 2, 0.5), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function renderMarker() {
+    clearLive();
+    lctx.save();
+    lctx.globalAlpha = 0.35;
+    lctx.strokeStyle = color;
+    lctx.lineWidth   = size * 2.5;
+    lctx.lineCap     = 'round';
+    lctx.lineJoin    = 'round';
+    lctx.beginPath();
+    lctx.moveTo(points[0].x, points[0].y);
+    for (var i = 1; i < points.length; i++) lctx.lineTo(points[i].x, points[i].y);
+    if (points.length === 1) lctx.lineTo(points[0].x + 0.01, points[0].y);
+    lctx.stroke();
+    lctx.restore();
+  }
+
+  function drawShape(ctx, a, b, c, s, filled, t) {
+    var x0 = a.x, y0 = a.y, x1 = b.x, y1 = b.y;
+
+    ctx.save();
+    ctx.strokeStyle = c;
+    ctx.fillStyle   = c;
+    ctx.lineWidth   = s;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+
+    if (t === 'line') {
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+
+    } else if (t === 'rect') {
+      var rx = Math.min(x0, x1), ry = Math.min(y0, y1);
+      var rw = Math.abs(x1 - x0), rh = Math.abs(y1 - y0);
+      if (filled) ctx.fillRect(rx, ry, rw, rh);
+      else        ctx.strokeRect(rx, ry, rw, rh);
+
+    } else if (t === 'ellipse') {
+      var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      var rrx = Math.abs(x1 - x0) / 2, rry = Math.abs(y1 - y0) / 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rrx, rry, 0, 0, Math.PI * 2);
+      filled ? ctx.fill() : ctx.stroke();
+
+    } else if (t === 'triangle') {
+      var left = Math.min(x0, x1), right = Math.max(x0, x1);
+      var top  = Math.min(y0, y1), bottom = Math.max(y0, y1);
+      ctx.beginPath();
+      ctx.moveTo((left + right) / 2, top);
+      ctx.lineTo(right, bottom);
+      ctx.lineTo(left,  bottom);
+      ctx.closePath();
+      filled ? ctx.fill() : ctx.stroke();
+
+    } else if (t === 'arrow') {
+      var dx = x1 - x0, dy = y1 - y0;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 1) {
+        var head = Math.min(Math.max(s * 3.5, 12), len * 0.6);
+        var ang  = Math.atan2(dy, dx);
+        var bx   = x1 - Math.cos(ang) * head * 0.9;
+        var by   = y1 - Math.sin(ang) * head * 0.9;
+
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x1 - Math.cos(ang - 0.45) * head, y1 - Math.sin(ang - 0.45) * head);
+        ctx.lineTo(x1 - Math.cos(ang + 0.45) * head, y1 - Math.sin(ang + 0.45) * head);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function constrain(a, b, t) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+
+    if (t === 'line' || t === 'arrow') {
+      var ang  = Math.atan2(dy, dx);
+      var step = Math.PI / 4;
+      ang = Math.round(ang / step) * step;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      return { x: a.x + Math.cos(ang) * len, y: a.y + Math.sin(ang) * len };
+    }
+
+    var m  = Math.max(Math.abs(dx), Math.abs(dy));
+    var sx = dx < 0 ? -1 : 1;
+    var sy = dy < 0 ? -1 : 1;
+    return { x: a.x + sx * m, y: a.y + sy * m };
+  }
+
+  /* --- history --- */
+  var undoStack = [], redoStack = [], MAX_HISTORY = 20;
+  var undoBtn = document.getElementById('undoBtn');
+  var redoBtn = document.getElementById('redoBtn');
+
+  function updateButtons() {
+    undoBtn.disabled = undoStack.length === 0;
+    redoBtn.disabled = redoStack.length === 0;
+  }
+
+  function pushHistory() {
+    undoStack.push(base.toDataURL('image/png'));
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack.length = 0;
+    updateButtons();
+  }
+
+  function restore(dataURL, cb) {
+    var img = new Image();
+    img.onload = function () {
+      bctx.clearRect(0, 0, W, H);
+      bctx.drawImage(img, 0, 0, W, H);
+      if (cb) cb();
+    };
+    img.src = dataURL;
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    clearLive();
+    redoStack.push(base.toDataURL('image/png'));
+    restore(undoStack.pop(), updateButtons);
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    clearLive();
+    undoStack.push(base.toDataURL('image/png'));
+    restore(redoStack.pop(), updateButtons);
+  }
+
+  /* --- pointer events --- */
+  function onDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    try { live.setPointerCapture(e.pointerId); } catch (err) {}
+
+    drawing = true;
+    var p = getPos(e);
+    startPt = p;
+    lastPt  = p;
+    points  = [p];
+
+    pushHistory();
+
+    if (tool === 'eraser') {
+      dotOn(bctx, p, '#ffffff', size);
+    } else if (tool === 'pen') {
+      clearLive();
+      dotOn(lctx, p, color, size);
+    } else if (tool === 'marker') {
+      renderMarker();
+    } else {
+      clearLive();
+    }
+  }
+
+  function onMove(e) {
+    if (!drawing) return;
+    e.preventDefault();
+
+    var p = getPos(e);
+
+    if (tool === 'pen') {
+      lctx.strokeStyle = color;
+      lctx.lineWidth   = size;
+      lctx.beginPath();
+      lctx.moveTo(lastPt.x, lastPt.y);
+      lctx.lineTo(p.x, p.y);
+      lctx.stroke();
+
+    } else if (tool === 'eraser') {
+      bctx.strokeStyle = '#ffffff';
+      bctx.lineWidth   = size;
+      bctx.beginPath();
+      bctx.moveTo(lastPt.x, lastPt.y);
+      bctx.lineTo(p.x, p.y);
+      bctx.stroke();
+
+    } else if (tool === 'marker') {
+      points.push(p);
+      renderMarker();
+
+    } else {
+      var end = e.shiftKey ? constrain(startPt, p, tool) : p;
+      clearLive();
+      drawShape(lctx, startPt, end, color, size, fillShapes, tool);
+    }
+
+    lastPt = p;
+  }
+
+  function onUp(e) {
+    if (!drawing) return;
+    drawing = false;
+    try { live.releasePointerCapture(e.pointerId); } catch (err) {}
+
+    if (tool !== 'eraser') {
+      bctx.save();
+      bctx.globalAlpha = 1;
+      bctx.drawImage(live, 0, 0);
+      bctx.restore();
+    }
+    clearLive();
+    updateButtons();
+  }
+
+  live.addEventListener('pointerdown', onDown);
+  live.addEventListener('pointermove', onMove);
+  live.addEventListener('pointerup', onUp);
+  live.addEventListener('pointercancel', onUp);
+  live.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* --- toolbar wiring --- */
+  var toolGroup = document.getElementById('toolGroup');
+  toolGroup.addEventListener('click', function (e) {
+    var btn = e.target.closest('.tool-btn');
+    if (!btn) return;
+    tool = btn.dataset.tool;
+    toolGroup.querySelectorAll('.tool-btn').forEach(function (b) {
+      b.classList.toggle('active', b === btn);
+    });
+  });
+
+  var colorGroup = document.getElementById('colorGroup');
+  colorGroup.addEventListener('click', function (e) {
+    var sw = e.target.closest('.swatch');
+    if (!sw) return;
+    color = sw.dataset.color;
+    colorGroup.querySelectorAll('.swatch').forEach(function (s) {
+      s.classList.toggle('active', s === sw);
+    });
+  });
+
+  var sizeRange = document.getElementById('sizeRange');
+  var sizeValue = document.getElementById('sizeValue');
+  sizeRange.addEventListener('input', function () {
+    size = parseInt(sizeRange.value, 10);
+    sizeValue.textContent = size;
+  });
+
+  document.getElementById('fillChk').addEventListener('change', function (e) {
+    fillShapes = e.target.checked;
+  });
+
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+
+  document.getElementById('clearBtn').addEventListener('click', function () {
+    pushHistory();
+    clearLive();
+    fillWhite();
+  });
+
+  /* Insert drawing into the text editor */
+  document.getElementById('insertBtn').addEventListener('click', function () {
+    var dataURL = base.toDataURL('image/png');
+    if (wysiwyg && typeof wysiwyg.insertHTML === 'function') {
+      wysiwyg.insertHTML(
+        '<img src="' + dataURL + '" alt="drawing" ' +
+        'style="max-width:100%;height:auto;display:block;">'
+      );
+      document.querySelector('.mode-tab[data-mode="text"]').click();
+    }
+  });
+
+  /* Keyboard shortcuts (only in Draw mode) */
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    if (currentMode !== 'draw') return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      e.shiftKey ? redo() : undo();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
+    }
+  });
+
+  updateButtons();
+
+  /* ============================================================
+     OVERRIDE print() — sends active mode to the printer
+     ============================================================ */
+  window.print = function () {
+    var highres  = document.querySelector('#highres').checked ? 2 : 0;
+    var contrast = document.querySelector('#contrast').value;
+
+    if (currentMode === 'draw') {
+      var dataUrl = base.toDataURL('image/png');
+      printer.print(dataUrl, contrast, highres);
+      return;
+    }
+
+    htmlToImage
+      .toPng(document.querySelector('.se-wrapper'))
+      .then(function (dataUrl) {
+        printer.print(dataUrl, contrast, highres);
+      });
+  };
+})();
 </script>
 </body>
 </html>
